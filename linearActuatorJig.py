@@ -79,23 +79,59 @@ class ActuatorGUI:
 
         ctk.CTkLabel(self.type_frame, text="Select Actuator Type:", font=ctk.CTkFont(size=14)).pack(anchor="w", pady=5)
 
-        self.act_type = ctk.StringVar(value="100mm")
-        self.radio_100 = ctk.CTkRadioButton(self.type_frame, text="100 mm", variable=self.act_type, value="100mm")
-        self.radio_100.pack(anchor="w", padx=10)
+        self.act_type = ctk.StringVar(value="50mm")
         self.radio_50 = ctk.CTkRadioButton(self.type_frame, text="50 mm", variable=self.act_type, value="50mm")
         self.radio_50.pack(anchor="w", padx=10)
+        self.radio_100 = ctk.CTkRadioButton(self.type_frame, text="100 mm", variable=self.act_type, value="100mm")
+        self.radio_100.pack(anchor="w", padx=10)
+
 
         # ---- Force Display ----
         self.force_frame = ctk.CTkFrame(root)
         self.force_frame.pack(pady=15, padx=20, fill="x")
 
+        # Push Force
         ctk.CTkLabel(self.force_frame, text="Push Force:", font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.push_force_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.push_force_label.grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.push_force_label.grid(row=0, column=1, padx=30, pady=5, sticky="w")
 
+        # Push Test Status
+        ctk.CTkLabel(self.force_frame, text="Push Test Status:", font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=10, pady=5, sticky="w")
+        self.push_test_status_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        self.push_test_status_label.grid(row=0, column=3, padx=30, pady=5, sticky="w")
+
+        # Backdrive Force
         ctk.CTkLabel(self.force_frame, text="Backdrive Force:", font=ctk.CTkFont(size=14)).grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.backdrive_force_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_force_label.grid(row=1, column=1, padx=10, pady=5, sticky="w")
+        self.backdrive_force_label.grid(row=1, column=1, padx=30, pady=5, sticky="w")
+
+        # Backdrive Test Status
+        ctk.CTkLabel(self.force_frame, text="Backdrive Test Status:", font=ctk.CTkFont(size=14)).grid(row=1, column=2, padx=10, pady=5, sticky="w")
+        self.backdrive_test_status_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        self.backdrive_test_status_label.grid(row=1, column=3, padx=30, pady=5, sticky="w")
+
+        # Backdrive Power Control
+        ctk.CTkLabel(self.force_frame, text="Backdrive Power (%)", font=ctk.CTkFont(size=14)).grid(
+            row=3, column=0, padx=10, pady=5, sticky="w"
+        )
+
+        self.backdrive_power_slider = ctk.CTkSlider(
+            self.force_frame,
+            from_=0,
+            to=100,
+            number_of_steps=100,
+            command=self.update_backdrive_power
+        )
+        self.backdrive_power_slider.set(50)  # default 50%
+        self.backdrive_power_slider.grid(row=3, column=1, padx=10, pady=5, sticky="ew")
+
+        # Label that shows "% power"
+        self.backdrive_percent_label = ctk.CTkLabel(
+            self.force_frame,
+            text="50%"   # 110/255 ≈ 43%
+        )
+        self.backdrive_percent_label.grid(row=3, column=2, padx=2, pady=5)
+
 
         # ---- Control Buttons ----
         self.btn_frame = ctk.CTkFrame(root)
@@ -146,6 +182,18 @@ class ActuatorGUI:
         send_command("backdrive test")
         print("Starting backdrive test for Actuator:", self.act_type.get(), "| ID:", self.actuator_id_entry.get())
 
+    def update_backdrive_power(self, value):
+        percent = int(value)  # slider value 0–100
+        pwm_value = int((percent / 100) * 255)
+
+        
+        self.backdrive_percent_label.configure(text=f"{percent}%")
+
+        # Store it (Python-side)
+        self.BACKDRIVE_PWM = pwm_value
+        
+        send_command(f"SET_BACKDRIVE_PWM:{pwm_value}") 
+
     def print_label(self):
         actuator_id = self.actuator_id_entry.get()
         act_type = self.act_type.get()
@@ -174,19 +222,70 @@ class ActuatorGUI:
         self.send_to_printer(label_text)
     
 
+    # def save_data(self):
+    #     actuator_id = self.actuator_id_entry.get().strip()
+    #     act_type = self.act_type.get()
+    #     push_force = self.push_force_label.cget("text")
+    #     backdrive_force = self.backdrive_force_label.cget("text")
+    #     push_test_status = self.push_test_status_label.cget("text"); 
+    #     backdrive_test_status = self.backdrive_test_status_label.cget("text"); 
+
+    #     if not actuator_id:
+    #         messagebox.showerror("Error", "Please enter Actuator ID before saving.")
+    #         return
+
+    #     # Save file on desktop
+    #     desktop = os.path.join(os.path.join(os.environ["USERPROFILE"]), "Desktop")
+    #     file_path = os.path.join(desktop, f"actuator_test_data.xlsx")
+
+    #     # If file exists → load it, otherwise create new workbook
+    #     if os.path.exists(file_path):
+    #         wb = load_workbook(file_path)
+    #         ws = wb.active
+    #     else:
+    #         wb = Workbook()
+    #         ws = wb.active
+    #         ws.title = "Test Results"
+
+    #         # Write the header row ONCE
+    #         ws.append(["Timestamp", "Actuator ID", "Type", "Push Force (KG)", "Backdrive Force (KG)", "Push Test Status", "Backdrive Test Status"])
+
+    #     # Current timestamp
+    #     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    #     # Append a new row of test data
+    #     ws.append([timestamp, actuator_id, act_type, push_force, backdrive_force, push_test_status, backdrive_test_status])
+
+    #     # Save file
+    #     wb.save(file_path)
+
+    #     try:
+    #         os.startfile(file_path)  # Windows only
+    #     except Exception as e:
+    #         print("Failed to open Excel file:", e)
+    
+    #     print(f"[FILE SAVED] {file_path}")
+    #     messagebox.showinfo("Saved", f"Test data saved to:\n{file_path}")
+
     def save_data(self):
         actuator_id = self.actuator_id_entry.get().strip()
         act_type = self.act_type.get()
         push_force = self.push_force_label.cget("text")
         backdrive_force = self.backdrive_force_label.cget("text")
+        push_test_status = self.push_test_status_label.cget("text")
+        backdrive_test_status = self.backdrive_test_status_label.cget("text")
 
         if not actuator_id:
             messagebox.showerror("Error", "Please enter Actuator ID before saving.")
             return
 
-        # Save file on desktop
+        # Desktop path
         desktop = os.path.join(os.path.join(os.environ["USERPROFILE"]), "Desktop")
-        file_path = os.path.join(desktop, "actuator_test_data.xlsx")
+
+        # build dated filename: actuator_test_data_YYYY-MM-DD.xlsx
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        file_name = f"actuator_test_data_{date_str}.xlsx"
+        file_path = os.path.join(desktop, file_name)
 
         # If file exists → load it, otherwise create new workbook
         if os.path.exists(file_path):
@@ -196,15 +295,16 @@ class ActuatorGUI:
             wb = Workbook()
             ws = wb.active
             ws.title = "Test Results"
-
             # Write the header row ONCE
-            ws.append(["Timestamp", "Actuator ID", "Type", "Push Force (N)", "Backdrive Force (N)"])
+            ws.append(["Timestamp", "Actuator ID", "Type", "Push Force (KG)",
+                    "Backdrive Force (KG)", "Push Test Status", "Backdrive Test Status"])
 
         # Current timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Append a new row of test data
-        ws.append([timestamp, actuator_id, act_type, push_force, backdrive_force])
+        ws.append([timestamp, actuator_id, act_type, push_force,
+                backdrive_force, push_test_status, backdrive_test_status])
 
         # Save file
         wb.save(file_path)
@@ -213,7 +313,7 @@ class ActuatorGUI:
             os.startfile(file_path)  # Windows only
         except Exception as e:
             print("Failed to open Excel file:", e)
-    
+
         print(f"[FILE SAVED] {file_path}")
         messagebox.showinfo("Saved", f"Test data saved to:\n{file_path}")
 
@@ -222,10 +322,10 @@ class ActuatorGUI:
     # Force Update Functions
     # -----------------------------
     def update_push_force(self, value):
-        self.push_force_label.configure(text=f"{value} N")
+        self.push_force_label.configure(text=f"{value} KG")
 
     def update_backdrive_force(self, value):
-        self.backdrive_force_label.configure(text=f"{value} N")
+        self.backdrive_force_label.configure(text=f"{value} KG")
 
     # -----------------------------
     # Arduino Communication
@@ -236,16 +336,23 @@ class ActuatorGUI:
         if line:
             print("Arduino:", line)
 
-            if line.startswith("PUSH_FORCE:"):
+            if line.startswith("PUSH_FORCE_PEAK:"):
                 value = line.split(":")[1].strip()
                 self.update_push_force(value)
             
-            elif line.startswith("BACKDRIVE_FORCE: "): 
+            elif line.startswith("BACKDRIVE_FORCE_PEAK: "): 
                 value = line.split(":")[1].strip()
                 self.update_backdrive_force(value)
             
-            elif line.startswith("BACKDRIVE TEST STARTED"): 
-                messagebox.showinfo("Test Update", f"BACKDRIVE TEST STARTED")
+            elif line.startswith("PUSH_TEST_STATUS:"):
+                status = (line.split(":")[1]).strip() 
+                color = "green" if status == "PASS" else "red"
+                self.push_test_status_label.configure(text=status, text_color=color)
+
+            elif line.startswith("BACKDRIVE_TEST_STATUS:"):
+                status = (line.split(":")[1]).strip() 
+                color = "green" if status == "PASS" else "red"
+                self.backdrive_test_status_label.configure(text=status, text_color=color)
 
             elif line.startswith("BACKDRIVE TEST COMPLETE"): 
                 messagebox.showinfo("Test Update", f"BACKDRIVE TEST COMPLETE")

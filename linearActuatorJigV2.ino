@@ -1,4 +1,3 @@
-
 ///////////////////////////////////////
 // FULL STATE MACHINE IMPLEMENTATION //
 ///////////////////////////////////////
@@ -37,7 +36,7 @@ const int in1 = 5;
 const int in2 = 6;
 
 // Motor 2
-const int enB = 11;
+const int enB = 11  ;
 const int in3 = 9;
 const int in4 = 10;
 
@@ -72,7 +71,7 @@ bool firstRun2 = true;
 int backdriveInitialPos = 0; 
 int backdriveFinalPos = 0; 
 
-const int BACKDRIVE_PWM = 110; 
+int BACKDRIVE_PWM = 125; 
 
 String backdriveTestStatus = "UNTESTED"; 
 String pushTestStatus = "UNTESTED"; 
@@ -198,8 +197,11 @@ void handleCommand() {
   }else if(inputCommand == "UNLOAD" || inputCommand == "LOAD"){
     systemState =  UNLOAD_STEP_1; 
     Serial.println("Moving to LOAD/UNLOAD position");  
-  }
-  else {
+  }else if (inputCommand.substring(0, 18) == "SET_BACKDRIVE_PWM:") {
+        BACKDRIVE_PWM = inputCommand.substring(18).toInt();
+        Serial.print("BACKDRIVE_PWM_UPDATED:");
+        Serial.println(BACKDRIVE_PWM);
+  } else {
     Serial.println("Unknown command");
   }
 
@@ -219,6 +221,7 @@ void runStateMachine() {
 
         case PUSH_TEST_STEP1:
             if (!stepInitialized) {
+                helperMotorSpeed = 255; 
                 helperMotorTarget = 0;
                 helperMotorActive = true;
                 stepInitialized = true;  // only do this once
@@ -312,22 +315,9 @@ void runStateMachine() {
           break;
         
         case BACKDRIVE_TEST_STEP3:
-
-          if (!stepInitialized) {
-                helperMotorSpeed = 155; 
-                helperMotorTarget = 250;
-                helperMotorActive = true;
-                stepInitialized = true;  // only do this once
-          }
-
-          if (!helperMotorActive) {  // motor finished
                 Serial.println("POT 2 VALUE" + String(analogRead(pot2))); 
                 systemState = BACKDRIVE_TEST_STEP4;
-                stepInitialized = false; // reset for next step
-          }
-
-
-          
+                stepInitialized = false; // reset for next step       
           break;
         
         
@@ -335,7 +325,7 @@ void runStateMachine() {
 
           if (!stepInitialized) {
                 helperMotorSpeed = BACKDRIVE_PWM; 
-                helperMotorTarget = 650;
+                helperMotorTarget = 700;
                 helperMotorActive = true;
                 stepInitialized = true;  // only do this once
           }
@@ -441,7 +431,7 @@ void updatetesterMotor() {
   }
 
   // Normal position control
-  if (abs(pos - testerMotorTarget) < 5) {
+  if (abs(pos - testerMotorTarget) < 15) {
     stopMotor(1);
     testerMotorActive = false;
     firstRun1 = true;
@@ -488,7 +478,7 @@ void updatehelperMotor() {
   }
 
   // Normal position control
-  if (abs(pos - helperMotorTarget) < 5) {
+  if (abs(pos - helperMotorTarget) < 20) {
     stopMotor(2);
     helperMotorActive = false;
     firstRun2 = true;
@@ -496,11 +486,11 @@ void updatehelperMotor() {
   }
 
   if (pos < helperMotorTarget) {
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, LOW);
-  } else {
     digitalWrite(in1, LOW);
     digitalWrite(in2, HIGH);
+  } else {
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2, LOW);
   }
 
   analogWrite(enA, helperMotorSpeed);
@@ -531,3 +521,13 @@ void updateLoadCell() {
         liveForce = scale.get_units(3);   // faster reading
     }
 }
+
+
+
+///// FEATURES TO IMPLEMENT POST LUNCH 
+
+// continous stream of load cell readings 
+// add slide bar to UI for force control 
+// improving logging to excel sheet 
+// continue running test with 3 actuators 
+// test without screws 
