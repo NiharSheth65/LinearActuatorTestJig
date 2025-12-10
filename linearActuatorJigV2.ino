@@ -36,7 +36,7 @@ const int in1 = 5;
 const int in2 = 6;
 
 // Motor 2
-const int enB = 11  ;
+const int enB = 11;
 const int in3 = 9;
 const int in4 = 10;
 
@@ -48,7 +48,24 @@ const int pot2 = A3;
 // Stall detection parameters
 // ------------------------------
 const int STALL_LIMIT = 10;           // minimum pot change to count as movement
-const unsigned long STALL_TIMEOUT = 3000;  // 3 seconds
+const unsigned long STALL_TIMEOUT = 4000;  // 3 seconds
+
+
+// Tester Motor PID
+bool testerInPIDMode = false; 
+float testerKp = 2.0;
+float testerKi = 0.0;
+float testerKd = 0.515;
+float testerIntegral = 0;
+float lastTesterError = 0;
+
+// Helper Motor PID
+bool helperInPIDMode = false; 
+float helperKp = 2.0;
+float helperKi = 0.0;
+float helperKd = 0.5;
+float helperIntegral = 0;
+float lastHelperError = 0;
 
 // ------------------------------
 // Motor state tracking
@@ -57,7 +74,9 @@ int testerMotorTarget = 0;
 int helperMotorTarget = 0;
 bool testerMotorActive = false;
 bool helperMotorActive = false;
+
 int testerMotorSpeed = 0; 
+
 int helperMotorSpeed = 0; 
 
 int lastPos1 = 0;
@@ -72,6 +91,9 @@ int backdriveInitialPos = 0;
 int backdriveFinalPos = 0; 
 
 int BACKDRIVE_PWM = 125; 
+
+unsigned long lastBackdriveLog = 0;
+const int BACKDRIVE_LOG_INTERVAL = 50; // ms
 
 String backdriveTestStatus = "UNTESTED"; 
 String pushTestStatus = "UNTESTED"; 
@@ -221,6 +243,7 @@ void runStateMachine() {
 
         case PUSH_TEST_STEP1:
             if (!stepInitialized) {
+                helperInPIDMode = false; 
                 helperMotorSpeed = 255; 
                 helperMotorTarget = 0;
                 helperMotorActive = true;
@@ -237,6 +260,7 @@ void runStateMachine() {
         
         case PUSH_TEST_STEP2:
             if (!stepInitialized) {
+                testerInPIDMode = false; 
                 testerMotorSpeed = 255; 
                 testerMotorTarget = 750;
                 testerMotorActive = true;
@@ -249,10 +273,6 @@ void runStateMachine() {
             }
 
             
-            if(liveForce > peakPushForce){
-              peakPushForce = liveForce; 
-            }
-            
             break;
 
         case PUSH_TEST_STEP3:
@@ -260,9 +280,8 @@ void runStateMachine() {
             systemState = IDLE;
             
             Serial.println("PUSH_FORCE_FINAL: " + String(liveForce)); 
-            Serial.println("PUSH_FORCE_PEAK: " + String(peakPushForce)); 
 
-            if(peakPushForce > 60 && liveForce > 60 ){
+            if(liveForce > 60 ){
               pushTestStatus = "PASS"; 
             }else{
                pushTestStatus = "FAIL"; 
@@ -283,6 +302,7 @@ void runStateMachine() {
         case BACKDRIVE_TEST_STEP1:
 
             if (!stepInitialized) {
+                  helperInPIDMode = false; 
                   helperMotorSpeed = 255; 
                   helperMotorTarget = 0;
                   helperMotorActive = true;
@@ -299,8 +319,11 @@ void runStateMachine() {
         case BACKDRIVE_TEST_STEP2:
 
           if (!stepInitialized) {
-                testerMotorTarget = 700;
-                testerMotorSpeed = 150; 
+                testerInPIDMode = true; 
+                testerIntegral = 0; 
+                lastTesterError = 0; 
+
+                testerMotorTarget = 600;
                 testerMotorActive = true;
                 stepInitialized = true;  // only do this once
           }
@@ -309,23 +332,36 @@ void runStateMachine() {
                 systemState = BACKDRIVE_TEST_STEP3;
                 stepInitialized = false; // reset for next step
                 backdriveInitialPos = analogRead(pot1); 
-                Serial.println("Starting Pot Value" + String(backdriveInitialPos)); 
+                Serial.println("Starting Pot Value: " + String(backdriveInitialPos)); 
           }
           
           break;
         
         case BACKDRIVE_TEST_STEP3:
-                Serial.println("POT 2 VALUE" + String(analogRead(pot2))); 
+
+          if (!stepInitialized) {
+                helperInPIDMode = true; 
+                helperIntegral = 0; 
+                lastHelperError = 0; 
+
+                helperMotorTarget = 400;
+                helperMotorActive = true;
+                stepInitialized = true;  // only do this once
+          }
+
+          if (!helperMotorActive) {  // motor finished
                 systemState = BACKDRIVE_TEST_STEP4;
-                stepInitialized = false; // reset for next step       
-          break;
+                stepInitialized = false; // reset for next step
+          }      
+        break;
         
         
         case BACKDRIVE_TEST_STEP4:
 
           if (!stepInitialized) {
+                helperInPIDMode = false; 
                 helperMotorSpeed = BACKDRIVE_PWM; 
-                helperMotorTarget = 700;
+                helperMotorTarget = 850;
                 helperMotorActive = true;
                 stepInitialized = true;  // only do this once
           }
@@ -335,8 +371,15 @@ void runStateMachine() {
                 stepInitialized = false; // reset for next step
           }
 
+
           if(liveForce > peakBackdriveForce){
             peakBackdriveForce = liveForce; 
+          }
+
+          if (millis() - lastBackdriveLog >= BACKDRIVE_LOG_INTERVAL) {
+            lastBackdriveLog = millis(); 
+            Serial.println("LIVE_BACKDRIVE_FORCE: " + String(liveForce)); 
+            Serial.println("POT_1_POS: " + String(analogRead(pot1))); 
           }
 
           break;
@@ -345,12 +388,13 @@ void runStateMachine() {
             systemState = IDLE; 
 
             backdriveFinalPos = analogRead(pot1); 
-            Serial.println("Ending Pot Value" + String(backdriveFinalPos)); 
-
+            Serial.println("Ending Pot Value: " + String(backdriveFinalPos)); 
 
             Serial.println("BACKDRIVE_FORCE_PEAK: " + String(peakBackdriveForce)); 
+           
             Serial.println("BACKDRIVE TEST COMPLETE"); 
-            
+            Serial.println("Helper Pos: " + String(analogRead(pot2))); 
+
             if(abs(backdriveFinalPos - backdriveInitialPos) > 20){
               backdriveTestStatus = "FAIL"; 
             }else{
@@ -362,11 +406,12 @@ void runStateMachine() {
             backdriveFinalPos = 0; 
             backdriveInitialPos = 0; 
             peakBackdriveForce = 0; 
-            
+
             break;
 
         case UNLOAD_STEP_1:
             if (!stepInitialized) {
+                helperInPIDMode = false; 
                 helperMotorSpeed = 255; 
                 helperMotorTarget = 0;
                 helperMotorActive = true;
@@ -382,6 +427,7 @@ void runStateMachine() {
         
         case UNLOAD_STEP_2:
             if (!stepInitialized) {
+                testerInPIDMode = false; 
                 testerMotorSpeed = 255; 
                 testerMotorTarget = 0;
                 testerMotorActive = true;
@@ -409,6 +455,7 @@ void updatetesterMotor() {
   if (!testerMotorActive) return;
 
   int pos = analogRead(pot1);
+  int speed = 0; 
 
   // Stall detection
   if (firstRun1) {
@@ -430,8 +477,20 @@ void updatetesterMotor() {
     return;
   }
 
+  if(testerInPIDMode){
+    float error = testerMotorTarget - pos;
+    testerIntegral += error;
+    float derivative = error - lastTesterError;
+    float output = testerKp * error + testerKi * testerIntegral + testerKd * derivative;
+    lastTesterError = error;
+
+    speed = constrain(abs(output), 10, 255);
+  }else{
+    speed = testerMotorSpeed; 
+  }
+
   // Normal position control
-  if (abs(pos - testerMotorTarget) < 15) {
+  if (abs(pos - testerMotorTarget) < 10) {
     stopMotor(1);
     testerMotorActive = false;
     firstRun1 = true;
@@ -439,14 +498,14 @@ void updatetesterMotor() {
   }
 
   if (pos < testerMotorTarget) {
-    analogWrite(in3, testerMotorSpeed);
+    analogWrite(in3, speed);
     digitalWrite(in4, LOW);
   } else {
     digitalWrite(in3, LOW);
-    analogWrite(in4, testerMotorSpeed);
+    analogWrite(in4, speed);
   }
 
-  analogWrite(enB, testerMotorSpeed);
+  analogWrite(enB, speed);
 }
 
 // ------------------------------
@@ -456,6 +515,7 @@ void updatehelperMotor() {
   if (!helperMotorActive) return;
 
   int pos = analogRead(pot2);
+  int speed = 0; 
 
   // Stall detection
   if (firstRun2) {
@@ -477,8 +537,21 @@ void updatehelperMotor() {
     return;
   }
 
+  if(helperInPIDMode){
+    float error = helperMotorTarget - pos;
+    helperIntegral += error;
+    float derivative = error - lastHelperError;
+    float output = helperKp * error + helperKi * helperIntegral + helperKd * derivative;
+    lastHelperError = error;
+
+    speed = constrain(abs(output), 10, 255);
+  }else{
+    speed = helperMotorSpeed; 
+  }
+
+
   // Normal position control
-  if (abs(pos - helperMotorTarget) < 20) {
+  if (abs(pos - helperMotorTarget) < 10) {
     stopMotor(2);
     helperMotorActive = false;
     firstRun2 = true;
@@ -493,7 +566,7 @@ void updatehelperMotor() {
     digitalWrite(in2, LOW);
   }
 
-  analogWrite(enA, helperMotorSpeed);
+  analogWrite(enA, speed);
 }
 
 // ------------------------------
