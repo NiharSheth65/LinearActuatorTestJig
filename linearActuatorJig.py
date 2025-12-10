@@ -8,7 +8,7 @@ import win32ui
 from datetime import datetime
 import os
 from openpyxl import Workbook, load_workbook
-
+import matplotlib.pyplot as plt
 
 
 # ---- Initialize theme ----
@@ -54,6 +54,40 @@ def send_command(cmd):
 
 
 
+
+
+backDriveForceReadings = [] 
+backDrivePositionReadings = [] 
+
+
+def plot_backdrive_data():
+    dt = 0.05
+    time = [i * dt for i in range(len(backDriveForceReadings))]
+
+    fig, ax1 = plt.subplots()
+
+    # --- FORCE on the left y-axis ---
+    ax1.set_xlabel("Time (seconds)")
+    ax1.set_ylabel("Force (kg)", color='red')
+    ax1.plot(time, backDriveForceReadings, color='red', marker='o', label="Force")
+    ax1.tick_params(axis='y', labelcolor='red')
+    ax1.set_ylim(0, 100)  # optional, based on your force range
+
+    # --- POSITION on the right y-axis ---
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Position (units)", color='blue')
+    ax2.plot(time, backDrivePositionReadings, color='blue', marker='x', label="Position")
+    ax2.tick_params(axis='y', labelcolor='blue')
+    ax2.set_ylim(500, 650)  # optional, based on your position range
+
+    plt.title("Force & Position vs Time (Dual Axes)")
+    fig.tight_layout()
+    plt.grid(True)
+    plt.show(block=False)
+
+
+
+
 class ActuatorGUI:
     def __init__(self, root):
         self.root = root
@@ -93,22 +127,34 @@ class ActuatorGUI:
         # Push Force
         ctk.CTkLabel(self.force_frame, text="Push Force:", font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.push_force_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.push_force_label.grid(row=0, column=1, padx=30, pady=5, sticky="w")
+        self.push_force_label.grid(row=0, column=1, padx=10, pady=5, sticky="w")
 
         # Push Test Status
         ctk.CTkLabel(self.force_frame, text="Push Test Status:", font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=10, pady=5, sticky="w")
         self.push_test_status_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.push_test_status_label.grid(row=0, column=3, padx=30, pady=5, sticky="w")
+        self.push_test_status_label.grid(row=0, column=3, padx=10, pady=5, sticky="w")
 
         # Backdrive Force
         ctk.CTkLabel(self.force_frame, text="Backdrive Force:", font=ctk.CTkFont(size=14)).grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.backdrive_force_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_force_label.grid(row=1, column=1, padx=30, pady=5, sticky="w")
+        self.backdrive_force_label.grid(row=1, column=1, padx=10, pady=5, sticky="w")
 
         # Backdrive Test Status
         ctk.CTkLabel(self.force_frame, text="Backdrive Test Status:", font=ctk.CTkFont(size=14)).grid(row=1, column=2, padx=10, pady=5, sticky="w")
         self.backdrive_test_status_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_test_status_label.grid(row=1, column=3, padx=30, pady=5, sticky="w")
+        self.backdrive_test_status_label.grid(row=1, column=3, padx=10, pady=5, sticky="w")
+
+        ctk.CTkLabel(self.force_frame, text="Test Actuator Start Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=4, padx=10, pady=5, sticky="w")
+        self.backdrive_test_start_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        self.backdrive_test_start_pos_label.grid(row=1, column=5, padx=10, pady=5, sticky="w")
+
+        ctk.CTkLabel(self.force_frame, text="Test Actuator End Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=6, padx=10, pady=5, sticky="w")
+        self.backdrive_test_end_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        self.backdrive_test_end_pos_label.grid(row=1, column=7, padx=10, pady=5, sticky="w")
+
+        ctk.CTkLabel(self.force_frame, text="Estimated Backdrive (mm):", font=ctk.CTkFont(size=14)).grid(row=1, column=8, padx=10, pady=5, sticky="w")
+        self.backdrive_test_distance_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        self.backdrive_test_distance_label.grid(row=1, column=9, padx=10, pady=5, sticky="w")
 
         # Backdrive Power Control
         ctk.CTkLabel(self.force_frame, text="Backdrive Power (%)", font=ctk.CTkFont(size=14)).grid(
@@ -180,6 +226,8 @@ class ActuatorGUI:
         print("Starting push test for Actuator:", self.act_type.get(), "| ID:", self.actuator_id_entry.get())
 
     def start_backdrive_test(self):
+        backDrivePositionReadings.clear()
+        backDriveForceReadings.clear() 
         send_command("backdrive test")
         print("Starting backdrive test for Actuator:", self.act_type.get(), "| ID:", self.actuator_id_entry.get())
 
@@ -280,15 +328,14 @@ class ActuatorGUI:
         self.push_force_label.configure(text=f"{value} KG")
 
     def update_backdrive_force(self, value):
-        self.backdrive_force_label.configure(text=f"{value} KG")
-
+        self.backdrive_force_label.configure(text=f"{value} KG")    
+    
     # -----------------------------
     # Arduino Communication
     # -----------------------------
 
   
     def read_arduino(self):
-        hello = 1
         line = arduino.readline().decode(errors='ignore').strip()
         
         if line:
@@ -298,14 +345,32 @@ class ActuatorGUI:
                 value = line.split(":")[1].strip()
                 self.update_push_force(value)
 
-
               
             elif line.startswith("BACKDRIVE_FORCE_PEAK: "):
-            #elif line.startswith("BACKDRIVE_APPLIED_FORCE: "):
                 value = line.split(":")[1].strip()
                 self.update_backdrive_force(value)
 
+            elif line.startswith("LIVE_BACKDRIVE_FORCE:"):
+                value = line.split(":")[1].strip()
+                backDriveForceReadings.append(float(value))
             
+            elif line.startswith("POT_1_POS:"): 
+                value = line.split(":")[1].strip()
+                backDrivePositionReadings.append(float(value))
+
+            elif line.startswith("Starting Pot Value: "):
+                value = (line.split(":")[1]).strip() 
+                self.backdrive_test_start_pos_label.configure(text=value, text_color='blue')
+            
+            elif line.startswith("Ending Pot Value: "):
+                value = (line.split(":")[1]).strip() 
+                self.backdrive_test_end_pos_label.configure(text=value, text_color='blue')
+
+                traverse = (int(self.backdrive_test_end_pos_label.cget("text")) - int(self.backdrive_test_start_pos_label.cget("text")))
+                estimatedBackDrive = abs((traverse/1023)*50)
+                estimatedBackDrive = str(round(estimatedBackDrive, 1))
+                self.backdrive_test_distance_label.configure(text=estimatedBackDrive, text_color='blue')
+
             elif line.startswith("PUSH_TEST_STATUS:"):
                 status = (line.split(":")[1]).strip() 
                 color = "green" if status == "PASS" else "red"
@@ -315,10 +380,11 @@ class ActuatorGUI:
                 status = (line.split(":")[1]).strip() 
                 color = "green" if status == "PASS" else "red"
                 self.backdrive_test_status_label.configure(text=status, text_color=color)
+                plot_backdrive_data()
 
             elif line.startswith("BACKDRIVE TEST COMPLETE"): 
                 messagebox.showinfo("Test Update", f"BACKDRIVE TEST COMPLETE")
-            
+
             elif line.startswith("PUSH TEST STARTED"):  
                 messagebox.showinfo("Test Update", f"PUSH TEST STARTED")
 
@@ -331,12 +397,11 @@ class ActuatorGUI:
             elif line.startswith("UNLOAD/LOAD COMPLETE"): 
                 messagebox.showinfo("Process Update", f"UNLOAD/LOAD COMPLETE")
 
-      
-      
-            
-            
+        
+  
  
         self.root.after(100, self.read_arduino)  # repeat every 100ms
+    
 
     def send_to_printer(self, text):
  

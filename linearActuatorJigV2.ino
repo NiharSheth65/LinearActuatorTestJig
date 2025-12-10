@@ -36,7 +36,7 @@ const int in1 = 5;
 const int in2 = 6;
 
 // Motor 2
-const int enB = 11  ;
+const int enB = 11;
 const int in3 = 9;
 const int in4 = 10;
 
@@ -48,7 +48,7 @@ const int pot2 = A3;
 // Stall detection parameters
 // ------------------------------
 const int STALL_LIMIT = 10;           // minimum pot change to count as movement
-const unsigned long STALL_TIMEOUT = 3000;  // 3 seconds
+const unsigned long STALL_TIMEOUT = 4000;  // 3 seconds
 
 // ------------------------------
 // Motor state tracking
@@ -73,11 +73,8 @@ int backdriveFinalPos = 0;
 
 int BACKDRIVE_PWM = 125; 
 
-float totalBackDriveForce = 0; 
-int backDriveCounter = 0; 
-
-float totalAppliedForce = 0; 
-int appliedForceCounter = 0; 
+unsigned long lastBackdriveLog = 0;
+const int BACKDRIVE_LOG_INTERVAL = 50; // ms
 
 String backdriveTestStatus = "UNTESTED"; 
 String pushTestStatus = "UNTESTED"; 
@@ -310,7 +307,7 @@ void runStateMachine() {
                 systemState = BACKDRIVE_TEST_STEP3;
                 stepInitialized = false; // reset for next step
                 backdriveInitialPos = analogRead(pot1); 
-                Serial.println("Starting Pot Value" + String(backdriveInitialPos)); 
+                Serial.println("Starting Pot Value: " + String(backdriveInitialPos)); 
           }
           
           break;
@@ -352,18 +349,11 @@ void runStateMachine() {
             peakBackdriveForce = liveForce; 
           }
 
-          if(analogRead(pot2) > 600){
-              totalAppliedForce += liveForce; 
-              appliedForceCounter++; 
+          if (millis() - lastBackdriveLog >= BACKDRIVE_LOG_INTERVAL) {
+            lastBackdriveLog = millis(); 
+            Serial.println("LIVE_BACKDRIVE_FORCE: " + String(liveForce)); 
+            Serial.println("POT_1_POS: " + String(analogRead(pot1))); 
           }
-
-          if (analogRead(pot1) < backdriveInitialPos-20) {   // actual backdrive motion
-              totalBackDriveForce += liveForce;
-              backDriveCounter++;
-          }
-          
-        
-
 
           break;
 
@@ -371,16 +361,13 @@ void runStateMachine() {
             systemState = IDLE; 
 
             backdriveFinalPos = analogRead(pot1); 
-            Serial.println("Ending Pot Value" + String(backdriveFinalPos)); 
+            Serial.println("Ending Pot Value: " + String(backdriveFinalPos)); 
 
-
-            Serial.println("BACKDRIVE_BACKDRIVING_FORCE: " + String(totalBackDriveForce / backDriveCounter)); 
-            Serial.println("BACKDRIVE_APPLIED_FORCE: " + String(totalAppliedForce / appliedForceCounter)); 
-            
             Serial.println("BACKDRIVE_FORCE_PEAK: " + String(peakBackdriveForce)); 
            
             Serial.println("BACKDRIVE TEST COMPLETE"); 
-            
+            Serial.println("Helper Pos: " + String(analogRead(pot2))); 
+
             if(abs(backdriveFinalPos - backdriveInitialPos) > 20){
               backdriveTestStatus = "FAIL"; 
             }else{
@@ -392,10 +379,6 @@ void runStateMachine() {
             backdriveFinalPos = 0; 
             backdriveInitialPos = 0; 
             peakBackdriveForce = 0; 
-            totalBackDriveForce = 0; 
-            backDriveCounter = 0;
-            totalAppliedForce = 0; 
-            appliedForceCounter = 0; 
 
             break;
 
