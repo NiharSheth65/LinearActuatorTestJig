@@ -161,6 +161,7 @@ class ActuatorGUI:
         # Start reading Arduino
         self.read_arduino()
 
+
     # -----------------------------
     # Button Functions
     # -----------------------------
@@ -221,52 +222,6 @@ class ActuatorGUI:
         # Windows printing
         self.send_to_printer(label_text)
     
-
-    # def save_data(self):
-    #     actuator_id = self.actuator_id_entry.get().strip()
-    #     act_type = self.act_type.get()
-    #     push_force = self.push_force_label.cget("text")
-    #     backdrive_force = self.backdrive_force_label.cget("text")
-    #     push_test_status = self.push_test_status_label.cget("text"); 
-    #     backdrive_test_status = self.backdrive_test_status_label.cget("text"); 
-
-    #     if not actuator_id:
-    #         messagebox.showerror("Error", "Please enter Actuator ID before saving.")
-    #         return
-
-    #     # Save file on desktop
-    #     desktop = os.path.join(os.path.join(os.environ["USERPROFILE"]), "Desktop")
-    #     file_path = os.path.join(desktop, f"actuator_test_data.xlsx")
-
-    #     # If file exists → load it, otherwise create new workbook
-    #     if os.path.exists(file_path):
-    #         wb = load_workbook(file_path)
-    #         ws = wb.active
-    #     else:
-    #         wb = Workbook()
-    #         ws = wb.active
-    #         ws.title = "Test Results"
-
-    #         # Write the header row ONCE
-    #         ws.append(["Timestamp", "Actuator ID", "Type", "Push Force (KG)", "Backdrive Force (KG)", "Push Test Status", "Backdrive Test Status"])
-
-    #     # Current timestamp
-    #     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    #     # Append a new row of test data
-    #     ws.append([timestamp, actuator_id, act_type, push_force, backdrive_force, push_test_status, backdrive_test_status])
-
-    #     # Save file
-    #     wb.save(file_path)
-
-    #     try:
-    #         os.startfile(file_path)  # Windows only
-    #     except Exception as e:
-    #         print("Failed to open Excel file:", e)
-    
-    #     print(f"[FILE SAVED] {file_path}")
-    #     messagebox.showinfo("Saved", f"Test data saved to:\n{file_path}")
-
     def save_data(self):
         actuator_id = self.actuator_id_entry.get().strip()
         act_type = self.act_type.get()
@@ -330,19 +285,26 @@ class ActuatorGUI:
     # -----------------------------
     # Arduino Communication
     # -----------------------------
+
+  
     def read_arduino(self):
+        hello = 1
         line = arduino.readline().decode(errors='ignore').strip()
         
         if line:
             print("Arduino:", line)
 
-            if line.startswith("PUSH_FORCE_PEAK:"):
+            if line.startswith("PUSH_FORCE_FINAL:"):
                 value = line.split(":")[1].strip()
                 self.update_push_force(value)
-            
-            elif line.startswith("BACKDRIVE_FORCE_PEAK: "): 
+
+
+              
+            elif line.startswith("BACKDRIVE_FORCE_PEAK: "):
+            #elif line.startswith("BACKDRIVE_APPLIED_FORCE: "):
                 value = line.split(":")[1].strip()
                 self.update_backdrive_force(value)
+
             
             elif line.startswith("PUSH_TEST_STATUS:"):
                 status = (line.split(":")[1]).strip() 
@@ -356,7 +318,7 @@ class ActuatorGUI:
 
             elif line.startswith("BACKDRIVE TEST COMPLETE"): 
                 messagebox.showinfo("Test Update", f"BACKDRIVE TEST COMPLETE")
-
+            
             elif line.startswith("PUSH TEST STARTED"):  
                 messagebox.showinfo("Test Update", f"PUSH TEST STARTED")
 

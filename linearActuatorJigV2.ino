@@ -73,6 +73,12 @@ int backdriveFinalPos = 0;
 
 int BACKDRIVE_PWM = 125; 
 
+float totalBackDriveForce = 0; 
+int backDriveCounter = 0; 
+
+float totalAppliedForce = 0; 
+int appliedForceCounter = 0; 
+
 String backdriveTestStatus = "UNTESTED"; 
 String pushTestStatus = "UNTESTED"; 
 
@@ -249,10 +255,6 @@ void runStateMachine() {
             }
 
             
-            if(liveForce > peakPushForce){
-              peakPushForce = liveForce; 
-            }
-            
             break;
 
         case PUSH_TEST_STEP3:
@@ -260,9 +262,8 @@ void runStateMachine() {
             systemState = IDLE;
             
             Serial.println("PUSH_FORCE_FINAL: " + String(liveForce)); 
-            Serial.println("PUSH_FORCE_PEAK: " + String(peakPushForce)); 
 
-            if(peakPushForce > 60 && liveForce > 60 ){
+            if(liveForce > 60 ){
               pushTestStatus = "PASS"; 
             }else{
                pushTestStatus = "FAIL"; 
@@ -299,7 +300,7 @@ void runStateMachine() {
         case BACKDRIVE_TEST_STEP2:
 
           if (!stepInitialized) {
-                testerMotorTarget = 700;
+                testerMotorTarget = 600;
                 testerMotorSpeed = 150; 
                 testerMotorActive = true;
                 stepInitialized = true;  // only do this once
@@ -315,17 +316,28 @@ void runStateMachine() {
           break;
         
         case BACKDRIVE_TEST_STEP3:
-                Serial.println("POT 2 VALUE" + String(analogRead(pot2))); 
+
+          if (!stepInitialized) {
+                helperMotorSpeed = 100; 
+                helperMotorTarget = 400;
+                helperMotorActive = true;
+                stepInitialized = true;  // only do this once
+          }
+
+          if (!helperMotorActive) {  // motor finished
                 systemState = BACKDRIVE_TEST_STEP4;
-                stepInitialized = false; // reset for next step       
-          break;
+                stepInitialized = false; // reset for next step
+          }      
+        break;
         
         
         case BACKDRIVE_TEST_STEP4:
 
+          //Serial.println("Live Force+ " + String(liveForce));
+
           if (!stepInitialized) {
                 helperMotorSpeed = BACKDRIVE_PWM; 
-                helperMotorTarget = 700;
+                helperMotorTarget = 850;
                 helperMotorActive = true;
                 stepInitialized = true;  // only do this once
           }
@@ -335,9 +347,23 @@ void runStateMachine() {
                 stepInitialized = false; // reset for next step
           }
 
+
           if(liveForce > peakBackdriveForce){
             peakBackdriveForce = liveForce; 
           }
+
+          if(analogRead(pot2) > 600){
+              totalAppliedForce += liveForce; 
+              appliedForceCounter++; 
+          }
+
+          if (analogRead(pot1) < backdriveInitialPos-20) {   // actual backdrive motion
+              totalBackDriveForce += liveForce;
+              backDriveCounter++;
+          }
+          
+        
+
 
           break;
 
@@ -348,7 +374,11 @@ void runStateMachine() {
             Serial.println("Ending Pot Value" + String(backdriveFinalPos)); 
 
 
+            Serial.println("BACKDRIVE_BACKDRIVING_FORCE: " + String(totalBackDriveForce / backDriveCounter)); 
+            Serial.println("BACKDRIVE_APPLIED_FORCE: " + String(totalAppliedForce / appliedForceCounter)); 
+            
             Serial.println("BACKDRIVE_FORCE_PEAK: " + String(peakBackdriveForce)); 
+           
             Serial.println("BACKDRIVE TEST COMPLETE"); 
             
             if(abs(backdriveFinalPos - backdriveInitialPos) > 20){
@@ -362,7 +392,11 @@ void runStateMachine() {
             backdriveFinalPos = 0; 
             backdriveInitialPos = 0; 
             peakBackdriveForce = 0; 
-            
+            totalBackDriveForce = 0; 
+            backDriveCounter = 0;
+            totalAppliedForce = 0; 
+            appliedForceCounter = 0; 
+
             break;
 
         case UNLOAD_STEP_1:
