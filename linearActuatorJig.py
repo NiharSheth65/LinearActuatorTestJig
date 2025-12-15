@@ -144,17 +144,17 @@ class ActuatorGUI:
         self.backdrive_test_status_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
         self.backdrive_test_status_label.grid(row=1, column=3, padx=10, pady=5, sticky="w")
 
-        ctk.CTkLabel(self.force_frame, text="Test Actuator Start Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=4, padx=10, pady=5, sticky="w")
-        self.backdrive_test_start_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_test_start_pos_label.grid(row=1, column=5, padx=10, pady=5, sticky="w")
+        # ctk.CTkLabel(self.force_frame, text="Test Actuator Start Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=4, padx=10, pady=5, sticky="w")
+        # self.backdrive_test_start_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        # self.backdrive_test_start_pos_label.grid(row=1, column=5, padx=10, pady=5, sticky="w")
 
-        ctk.CTkLabel(self.force_frame, text="Test Actuator End Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=6, padx=10, pady=5, sticky="w")
-        self.backdrive_test_end_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_test_end_pos_label.grid(row=1, column=7, padx=10, pady=5, sticky="w")
+        # ctk.CTkLabel(self.force_frame, text="Test Actuator End Pos:", font=ctk.CTkFont(size=14)).grid(row=1, column=6, padx=10, pady=5, sticky="w")
+        # self.backdrive_test_end_pos_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
+        # self.backdrive_test_end_pos_label.grid(row=1, column=7, padx=10, pady=5, sticky="w")
 
-        ctk.CTkLabel(self.force_frame, text="Estimated Backdrive (mm):", font=ctk.CTkFont(size=14)).grid(row=1, column=8, padx=10, pady=5, sticky="w")
+        ctk.CTkLabel(self.force_frame, text="Estimated Backdrive (mm):", font=ctk.CTkFont(size=14)).grid(row=1, column=4, padx=10, pady=5, sticky="w")
         self.backdrive_test_distance_label = ctk.CTkLabel(self.force_frame, text="---", font=ctk.CTkFont(size=14), text_color="blue")
-        self.backdrive_test_distance_label.grid(row=1, column=9, padx=10, pady=5, sticky="w")
+        self.backdrive_test_distance_label.grid(row=1, column=5, padx=10, pady=5, sticky="w")
 
         # Backdrive Power Control
         ctk.CTkLabel(self.force_frame, text="Backdrive Power (%)", font=ctk.CTkFont(size=14)).grid(
@@ -199,10 +199,15 @@ class ActuatorGUI:
         self.backdrive_test_btn.grid(row=2, column=1, padx=10, pady=5)
 
         # Print / Save
-        self.print_btn = ctk.CTkButton(self.btn_frame, text="Print Label", width=200, command=self.print_label)
+        self.print_btn = ctk.CTkButton(self.btn_frame, text="Print Label", width=200, fg_color="green", hover_color="#728C69", command=self.print_label)
         self.print_btn.grid(row=3, column=0, padx=10, pady=5)
-        self.save_data_btn = ctk.CTkButton(self.btn_frame, text="Save Test Data", width=200, command=self.save_data)
-        self.save_data_btn.grid(row=3, column=1, padx=10, pady=5)
+        
+        self.save_excel_data_btn = ctk.CTkButton(self.btn_frame, text="Save To Excel", fg_color="green" ,hover_color="#728C69", width=200, command=self.save_data_to_excel)
+        self.save_excel_data_btn.grid(row=3, column=1, padx=10, pady=5)
+            
+        self.save_text_data_btn = ctk.CTkButton(self.btn_frame, text="Save To TXT File", fg_color="green", hover_color="#728C69", width=200, command=self.save_data_to_txt)
+        self.save_text_data_btn.grid(row=4, column=0, padx=10, pady=5)
+
 
         # Start reading Arduino
         self.read_arduino()
@@ -270,13 +275,16 @@ class ActuatorGUI:
         # Windows printing
         self.send_to_printer(label_text)
     
-    def save_data(self):
+    def save_data_to_excel(self):
         actuator_id = self.actuator_id_entry.get().strip()
         act_type = self.act_type.get()
         push_force = self.push_force_label.cget("text")
         backdrive_force = self.backdrive_force_label.cget("text")
         push_test_status = self.push_test_status_label.cget("text")
         backdrive_test_status = self.backdrive_test_status_label.cget("text")
+        estimated_back_drive = self.backdrive_test_distance_label.cget("text")
+        percent_power_used = self.backdrive_power_slider.get()
+
 
         if not actuator_id:
             messagebox.showerror("Error", "Please enter Actuator ID before saving.")
@@ -300,14 +308,14 @@ class ActuatorGUI:
             ws.title = "Test Results"
             # Write the header row ONCE
             ws.append(["Timestamp", "Actuator ID", "Type", "Push Force (KG)",
-                    "Backdrive Force (KG)", "Push Test Status", "Backdrive Test Status"])
+                    "Backdrive Force (KG)", "Push Test Status", "Backdrive Test Status", "Estimated Back Drive", "Backdrive % Used"])
 
         # Current timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Append a new row of test data
         ws.append([timestamp, actuator_id, act_type, push_force,
-                backdrive_force, push_test_status, backdrive_test_status])
+                backdrive_force, push_test_status, backdrive_test_status, estimated_back_drive, percent_power_used])
 
         # Save file
         wb.save(file_path)
@@ -321,6 +329,43 @@ class ActuatorGUI:
         messagebox.showinfo("Saved", f"Test data saved to:\n{file_path}")
 
 
+    def save_data_to_txt(self):
+        actuator_id = self.actuator_id_entry.get().strip()
+        act_type = self.act_type.get()
+        push_force = self.push_force_label.cget("text").split()[0]
+        backdrive_force = self.backdrive_force_label.cget("text").split()[0]
+        push_test_status = self.push_test_status_label.cget("text")
+        backdrive_test_status = self.backdrive_test_status_label.cget("text")
+        estimated_back_drive = self.backdrive_test_distance_label.cget("text")
+        percent_power_used = self.backdrive_power_slider.get()
+
+
+        if not actuator_id:
+            messagebox.showerror("Error", "Please enter Actuator ID before saving.")
+            return
+
+        # Generate tab-delimited row
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = [timestamp, actuator_id, act_type, push_force, backdrive_force, push_test_status, backdrive_test_status, estimated_back_drive, percent_power_used]
+        row_text = "\t".join(map(str, row)) + "\n"
+
+        # Save file on desktop
+        desktop = os.path.join(os.environ["USERPROFILE"], "Desktop")
+        filename = f"actuator_test_copyable_{datetime.now().strftime('%Y-%m-%d')}.txt"
+        file_path = os.path.join(desktop, filename)
+
+        # Append to the file if it exists
+        with open(file_path, 'a') as f:
+            f.write(row_text)
+        
+        try:
+            os.startfile(file_path)  # Windows only
+        except Exception as e:
+            print("Failed to open Text file:", e)
+
+        print(f"[FILE SAVED] {file_path}")
+        messagebox.showinfo("Saved", f"Test data saved to:\n{file_path}")
+     
     # -----------------------------
     # Force Update Functions
     # -----------------------------
@@ -358,18 +403,10 @@ class ActuatorGUI:
                 value = line.split(":")[1].strip()
                 backDrivePositionReadings.append(float(value))
 
-            elif line.startswith("Starting Pot Value: "):
+     
+            elif line.startswith("Estimated Backdrive: "):
                 value = (line.split(":")[1]).strip() 
-                self.backdrive_test_start_pos_label.configure(text=value, text_color='blue')
-            
-            elif line.startswith("Ending Pot Value: "):
-                value = (line.split(":")[1]).strip() 
-                self.backdrive_test_end_pos_label.configure(text=value, text_color='blue')
-
-                traverse = (int(self.backdrive_test_end_pos_label.cget("text")) - int(self.backdrive_test_start_pos_label.cget("text")))
-                estimatedBackDrive = abs((traverse/1023)*50)
-                estimatedBackDrive = str(round(estimatedBackDrive, 1))
-                self.backdrive_test_distance_label.configure(text=estimatedBackDrive, text_color='blue')
+                self.backdrive_test_distance_label.configure(text=value, text_color='blue')
 
             elif line.startswith("PUSH_TEST_STATUS:"):
                 status = (line.split(":")[1]).strip() 

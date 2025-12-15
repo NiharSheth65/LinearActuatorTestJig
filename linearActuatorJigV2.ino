@@ -53,7 +53,7 @@ const unsigned long STALL_TIMEOUT = 4000;  // 3 seconds
 
 // Tester Motor PID
 bool testerInPIDMode = false; 
-float testerKp = 2.0;
+float testerKp = 1.5;
 float testerKi = 0.0;
 float testerKd = 0.515;
 float testerIntegral = 0;
@@ -120,6 +120,7 @@ enum SystemState {
   BACKDRIVE_TEST_STEP3, 
   BACKDRIVE_TEST_STEP4, 
   BACKDRIVE_TEST_STEP5, 
+  BACKDRIVE_TEST_STEP6, 
   UNLOAD_STEP_1, 
   UNLOAD_STEP_2, 
 };
@@ -315,8 +316,27 @@ void runStateMachine() {
             }
             
             break;
-          
+
         case BACKDRIVE_TEST_STEP2:
+
+          if (!stepInitialized) {
+                testerInPIDMode = true; 
+                testerIntegral = 0; 
+                lastTesterError = 0; 
+
+                testerMotorTarget = 550;
+                testerMotorActive = true;
+                stepInitialized = true;  // only do this once
+          }
+
+          if (!testerMotorActive) {  // motor finished
+                systemState = BACKDRIVE_TEST_STEP3;
+                stepInitialized = false; // reset for next step
+          }
+          
+          break;
+          
+        case BACKDRIVE_TEST_STEP3:
 
           if (!stepInitialized) {
                 testerInPIDMode = true; 
@@ -329,7 +349,7 @@ void runStateMachine() {
           }
 
           if (!testerMotorActive) {  // motor finished
-                systemState = BACKDRIVE_TEST_STEP3;
+                systemState = BACKDRIVE_TEST_STEP4;
                 stepInitialized = false; // reset for next step
                 backdriveInitialPos = analogRead(pot1); 
                 Serial.println("Starting Pot Value: " + String(backdriveInitialPos)); 
@@ -337,7 +357,7 @@ void runStateMachine() {
           
           break;
         
-        case BACKDRIVE_TEST_STEP3:
+        case BACKDRIVE_TEST_STEP4:
 
           if (!stepInitialized) {
                 helperInPIDMode = true; 
@@ -350,13 +370,14 @@ void runStateMachine() {
           }
 
           if (!helperMotorActive) {  // motor finished
-                systemState = BACKDRIVE_TEST_STEP4;
+                systemState = BACKDRIVE_TEST_STEP5;
                 stepInitialized = false; // reset for next step
           }      
         break;
+
         
         
-        case BACKDRIVE_TEST_STEP4:
+        case BACKDRIVE_TEST_STEP5:
 
           if (!stepInitialized) {
                 helperInPIDMode = false; 
@@ -367,7 +388,7 @@ void runStateMachine() {
           }
 
           if (!helperMotorActive) {  // motor finished
-                systemState = BACKDRIVE_TEST_STEP5;
+                systemState = BACKDRIVE_TEST_STEP6;
                 stepInitialized = false; // reset for next step
           }
 
@@ -384,16 +405,16 @@ void runStateMachine() {
 
           break;
 
-        case BACKDRIVE_TEST_STEP5:
+        case BACKDRIVE_TEST_STEP6:
             systemState = IDLE; 
 
             backdriveFinalPos = analogRead(pot1); 
             Serial.println("Ending Pot Value: " + String(backdriveFinalPos)); 
-
             Serial.println("BACKDRIVE_FORCE_PEAK: " + String(peakBackdriveForce)); 
+            Serial.println("Estimated Backdrive: " + String(abs(50*(float(backdriveFinalPos - backdriveInitialPos))/1023))); 
            
             Serial.println("BACKDRIVE TEST COMPLETE"); 
-            Serial.println("Helper Pos: " + String(analogRead(pot2))); 
+            // Serial.println("Helper Pos: " + String(analogRead(pot2))); 
 
             if(abs(backdriveFinalPos - backdriveInitialPos) > 20){
               backdriveTestStatus = "FAIL"; 
@@ -429,7 +450,7 @@ void runStateMachine() {
             if (!stepInitialized) {
                 testerInPIDMode = false; 
                 testerMotorSpeed = 255; 
-                testerMotorTarget = 0;
+                testerMotorTarget = 50;
                 testerMotorActive = true;
                 stepInitialized = true;  // only do this once
             }
